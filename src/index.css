@@ -1,0 +1,129 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg: #0F1117;
+  --color-surface: #1A1D27;
+  --color-surface-2: #232636;
+  --color-surface-3: #2D3047;
+  --color-border: #2D3047;
+  --color-primary: #4F7EFF;
+  --color-success: #3ECF6B;
+  --color-warning: #F5A623;
+  --color-danger: #FF5757;
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #8B8FA8;
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-top: env(safe-area-inset-top, 0px);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: 'DM Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+}
+
+#root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Scrollable content area */
+.scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.scroll-area::-webkit-scrollbar {
+  display: none;
+}
+
+/* Bottom nav safe area */
+.bottom-nav {
+  padding-bottom: var(--safe-area-bottom);
+}
+
+/* Touch targets */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Priority badges */
+.priority-critical { @apply bg-danger/20 text-danger border border-danger/30; }
+.priority-very_urgent { @apply bg-warning/20 text-warning border border-warning/30; }
+.priority-urgent { @apply bg-primary/20 text-primary border border-primary/30; }
+.priority-plannable { @apply bg-success/20 text-success border border-success/30; }
+.priority-flexible { @apply bg-surface-3 text-text-secondary border border-border; }
+
+/* Worker colors */
+.worker-jc { color: #4F7EFF; }
+.worker-madame { color: #A855F7; }
+.worker-jc-bg { background-color: rgba(79, 126, 255, 0.15); }
+.worker-madame-bg { background-color: rgba(168, 85, 247, 0.15); }
+
+/* Timeline */
+.timeline-line {
+  position: relative;
+}
+.timeline-line::before {
+  content: '';
+  position: absolute;
+  left: 20px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-border);
+}
+
+/* Animations */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--color-surface) 25%, var(--color-surface-2) 50%, var(--color-surface) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+/* Input styles */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.7;
+}
+
+/* Custom scrollbar for desktop */
+@media (min-width: 768px) {
+  .scroll-area::-webkit-scrollbar {
+    display: block;
+    width: 4px;
+  }
+  .scroll-area::-webkit-scrollbar-track {
+    background: var(--color-surface);
+  }
+  .scroll-area::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 2px;
+  }
+}
