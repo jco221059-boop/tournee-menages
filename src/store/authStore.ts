@@ -27,12 +27,18 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   initialize: async () => {
-    const { data } = await supabase.auth.getSession()
-    set({
-      user: data.session?.user ?? null,
-      session: data.session,
-      loading: false,
-    })
+    try {
+      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
+      const sessionPromise = supabase.auth.getSession().then(({ data }) => data.session)
+      const session = await Promise.race([sessionPromise, timeout])
+      set({
+        user: session?.user ?? null,
+        session: session ?? null,
+        loading: false,
+      })
+    } catch {
+      set({ user: null, session: null, loading: false })
+    }
 
     supabase.auth.onAuthStateChange((_, session) => {
       set({ user: session?.user ?? null, session })
