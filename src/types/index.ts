@@ -1,3 +1,9 @@
+// ─── Rôles ───────────────────────────────────────────────────────────────────
+
+export type UserRole = 'admin' | 'cleaner'
+
+// ─── Anciens types ────────────────────────────────────────────────────────────
+
 export type Priority = 'critical' | 'very_urgent' | 'urgent' | 'plannable' | 'flexible'
 export type DirtinessLevel = 'clean' | 'normal' | 'dirty'
 export type Platform = 'airbnb' | 'booking' | 'direct' | 'other'
@@ -8,27 +14,155 @@ export type StepType = 'travel' | 'cleaning' | 'break' | 'pickup' | 'dropoff'
 export type AlertType = 'conflict' | 'missing_cleaning' | 'overlap' | 'tight_window'
 export type AlertSeverity = 'error' | 'warning' | 'info'
 
-export interface Worker {
+// ─── Nouveaux types ───────────────────────────────────────────────────────────
+
+export type MissionStatus = 'pending' | 'in_progress' | 'completed' | 'problem'
+export type TaskType = 'simple' | 'photo' | 'video' | 'control' | 'optional'
+export type RoomType =
+  | 'entrance' | 'bedroom' | 'bathroom' | 'wc'
+  | 'kitchen' | 'living' | 'balcony' | 'terrace'
+  | 'laundry' | 'garage' | 'other'
+export type AnomalyUrgency = 'low' | 'medium' | 'urgent'
+
+export interface Room {
+  id: string
+  property_id: string
+  name: string
+  room_type: RoomType
+  order_index: number
+  created_at: string
+}
+
+export interface Task {
+  id: string
+  title: string
+  description?: string | null
+  task_type: TaskType
+  is_mandatory: boolean
+  photo_required: boolean
+  can_skip: boolean
+  video_url?: string | null
+  created_at: string
+}
+
+export interface WorkflowStep {
+  id: string
+  workflow_id: string
+  task_id: string
+  task?: Task
+  room_id: string
+  room?: Room
+  order_index: number
+  is_mandatory: boolean
+}
+
+export interface Workflow {
   id: string
   name: string
-  color: string
+  property_id?: string | null
+  property?: Property
   is_active: boolean
+  steps?: WorkflowStep[]
   created_at: string
 }
 
 export interface Property {
   id: string
   name: string
-  address: string
+  address?: string | null
   lat?: number | null
   lng?: number | null
-  surface_m2: number
-  bedrooms: number
-  bathrooms: number
-  base_cleaning_duration_min: number
+  surface_m2?: number | null
+  bedrooms?: number | null
+  bathrooms?: number | null
+  base_cleaning_duration_min?: number | null
   notes?: string | null
+  property_type?: 'apartment' | 'house' | null
+  apartment_type?: string | null
+  building_code?: string | null
+  door_code?: string | null
+  key_box?: string | null
+  key_instructions?: string | null
+  linen_location?: string | null
+  dirty_linen_location?: string | null
+  products_location?: string | null
+  trash_location?: string | null
+  rooms?: Room[]
+  workflows?: Workflow[]
   created_at: string
   updated_at: string
+}
+
+export interface MissionStep {
+  id: string
+  mission_id: string
+  task_id: string
+  task?: Task
+  room_id: string
+  room?: Room
+  status: 'pending' | 'completed' | 'skipped'
+  is_mandatory: boolean
+  skip_reason?: string | null
+  comment?: string | null
+  order_index: number
+}
+
+export interface Anomaly {
+  id: string
+  mission_id: string
+  anomaly_type: string
+  urgency: AnomalyUrgency
+  is_blocking: boolean
+  comment?: string | null
+  room?: Room
+  created_at: string
+}
+
+export interface MissionPhoto {
+  id: string
+  mission_id: string
+  step_id?: string | null
+  url: string
+  created_at: string
+}
+
+export interface MissionReport {
+  id: string
+  mission_id: string
+  final_status: 'ready' | 'ready_with_note' | 'not_ready'
+  duration_min?: number | null
+  steps_total: number
+  steps_completed: number
+  anomalies_count: number
+}
+
+export interface Mission {
+  id: string
+  property_id: string
+  property?: Property
+  workflow_id?: string | null
+  status: MissionStatus
+  scheduled_date: string
+  scheduled_time?: string | null
+  checkin_time?: string | null
+  time_tracking_mode: 'none' | 'start_end'
+  notes?: string | null
+  steps?: MissionStep[]
+  anomalies?: Anomaly[]
+  photos?: MissionPhoto[]
+  report?: MissionReport
+  created_at: string
+  updated_at: string
+}
+
+// ─── Types compatibilité ──────────────────────────────────────────────────────
+
+export interface Worker {
+  id: string
+  name: string
+  color: string
+  is_active: boolean
+  created_at: string
 }
 
 export interface Reservation {
@@ -100,9 +234,6 @@ export interface Alert {
   type: AlertType
   severity: AlertSeverity
   message: string
-  property_id?: string | null
-  reservation_id?: string | null
-  date?: string | null
   resolved: boolean
   created_at: string
 }
@@ -116,30 +247,23 @@ export interface AppSettings {
   checkout_time: string
   checkin_time: string
   home_address: string
-  home_lat?: string
-  home_lng?: string
 }
 
+// ─── Types optimizer (compatibilité) ─────────────────────────────────────────
+
 export interface OptimizationInput {
-  date: string
   jobs: CleaningJob[]
   workers: Worker[]
   settings: AppSettings
+  date: string
 }
 
 export interface OptimizationResult {
   steps: Omit<PlanStep, 'id' | 'daily_plan_id'>[]
-  warnings: string[]
-  totalJobsScheduled: number
-  totalJobsSkipped: number
+  totalDuration?: number
   carTrips: number
-  skippedJobs: CleaningJob[]
-}
-
-export interface DailyStats {
-  date: string
-  totalJobs: number
-  completedJobs: number
-  totalDurationMin: number
-  jobsByPriority: Record<Priority, number>
+  warnings?: string[]
+  totalJobsScheduled?: number
+  totalJobsSkipped?: number
+  skippedJobs?: CleaningJob[]
 }

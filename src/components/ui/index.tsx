@@ -1,4 +1,4 @@
-import { forwardRef } from 'react'
+import { forwardRef, useState, useCallback } from 'react'
 import clsx from 'clsx'
 import type { Priority, AlertSeverity } from '../../types'
 import { priorityLabel } from '../../lib/optimizer'
@@ -260,17 +260,18 @@ interface EmptyStateProps {
   icon: React.ReactNode
   title: string
   description?: string
+  subtitle?: string
   action?: React.ReactNode
 }
 
-export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
+export function EmptyState({ icon, title, description, subtitle, action }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
       <div className="w-16 h-16 rounded-2xl bg-surface-2 flex items-center justify-center mb-4 text-text-muted">
         {icon}
       </div>
       <h3 className="text-base font-semibold text-text-primary mb-1">{title}</h3>
-      {description && <p className="text-sm text-text-secondary mb-4">{description}</p>}
+      {(description || subtitle) && <p className="text-sm text-text-secondary mb-4">{description || subtitle}</p>}
       {action}
     </div>
   )
@@ -335,4 +336,88 @@ export function Toggle({ checked, onChange, label }: ToggleProps) {
       {label && <span className="text-sm text-text-primary">{label}</span>}
     </label>
   )
+}
+
+// ─── BottomSheet ─────────────────────────────────────────────
+
+interface BottomSheetProps {
+  open: boolean
+  onClose: () => void
+  title?: string
+  children: React.ReactNode
+}
+
+export function BottomSheet({ open, onClose, title, children }: BottomSheetProps) {
+  if (!open) return null
+  return (
+    <>
+      {/* Overlay */}
+      <div
+        className="fixed inset-0 z-40"
+        style={{ background: 'rgba(44,31,14,0.35)' }}
+        onClick={onClose}
+      />
+      {/* Sheet */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl flex flex-col"
+        style={{
+          background: '#FAF7F2',
+          maxHeight: '90vh',
+          paddingBottom: 'env(safe-area-inset-bottom, 16px)',
+        }}
+      >
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+          <div className="w-10 h-1.5 rounded-full" style={{ background: '#EDE0D0' }} />
+        </div>
+        {/* Titre */}
+        {title && (
+          <div className="px-5 pb-4 flex-shrink-0">
+            <h3 className="text-base font-bold" style={{ color: '#2C1F0E', letterSpacing: '-0.01em' }}>
+              {title}
+            </h3>
+          </div>
+        )}
+        {/* Contenu scrollable */}
+        <div className="overflow-y-auto px-5 pb-5" style={{ scrollbarWidth: 'none' }}>
+          {children}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ─── Toast ───────────────────────────────────────────────────
+
+interface ToastProps {
+  message?: string
+  visible?: boolean
+  show?: boolean
+  variant?: string
+}
+
+export function Toast({ message = 'Enregistré ✓', visible, show }: ToastProps) {
+  if (!visible && !show) return null
+  return (
+    <div
+      className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-sm font-bold text-white shadow-lg"
+      style={{ background: '#2C1F0E' }}
+    >
+      {message}
+    </div>
+  )
+}
+
+// ─── useToast ────────────────────────────────────────────────
+
+
+export function useToast(duration = 2000) {
+  const [visible, setVisible] = useState(false)
+
+  const trigger = useCallback(() => {
+    setVisible(true)
+    setTimeout(() => setVisible(false), duration)
+  }, [duration])
+
+  return { visible, show: visible, trigger }
 }

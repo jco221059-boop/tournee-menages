@@ -1,69 +1,72 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 import type {
-  Property,
-  Reservation,
-  CleaningJob,
-  Worker,
-  DailyPlan,
-  PlanStep,
-  Alert,
-  AppSettings,
+  Property, Worker, Alert, AppSettings,
+  Mission, Task, Workflow, WorkflowStep, Room,
+  MissionStep, Anomaly,
 } from '../types'
 
 interface AppState {
-  // Data
+  // ── Données ──────────────────────────────────────────────
   properties: Property[]
-  reservations: Reservation[]
-  cleaningJobs: CleaningJob[]
+  tasks: Task[]
+  workflows: Workflow[]
+  missions: Mission[]
   workers: Worker[]
-  dailyPlans: DailyPlan[]
-  planSteps: PlanStep[]
   alerts: Alert[]
   settings: AppSettings
 
-  // UI
   loading: boolean
   error: string | null
 
-  // Property actions
+  // ── Propriétés ───────────────────────────────────────────
   fetchProperties: () => Promise<void>
-  addProperty: (p: Omit<Property, 'id' | 'created_at' | 'updated_at'>) => Promise<Property>
+  addProperty: (p: Partial<Property>) => Promise<Property>
   updateProperty: (id: string, updates: Partial<Property>) => Promise<void>
   deleteProperty: (id: string) => Promise<void>
+  addRoom: (propertyId: string, room: Omit<Room, 'id' | 'created_at'>) => Promise<Room>
+  deleteRoom: (roomId: string) => Promise<void>
+  reorderRooms: (propertyId: string, roomIds: string[]) => Promise<void>
 
-  // Reservation actions
-  fetchReservations: () => Promise<void>
-  addReservation: (r: Omit<Reservation, 'id' | 'created_at' | 'updated_at' | 'property'>) => Promise<Reservation>
-  updateReservation: (id: string, updates: Partial<Reservation>) => Promise<void>
-  deleteReservation: (id: string) => Promise<void>
+  // ── Tâches ───────────────────────────────────────────────
+  fetchTasks: () => Promise<void>
+  createTask: (data: Partial<Task>) => Promise<Task>
+  updateTask: (id: string, updates: Partial<Task>) => Promise<void>
+  deleteTask: (id: string) => Promise<void>
 
-  // Cleaning job actions
-  fetchCleaningJobs: (date?: string) => Promise<void>
-  addCleaningJob: (j: Omit<CleaningJob, 'id' | 'created_at' | 'updated_at' | 'property' | 'reservation' | 'worker'>) => Promise<CleaningJob>
-  updateCleaningJob: (id: string, updates: Partial<CleaningJob>) => Promise<void>
-  deleteCleaningJob: (id: string) => Promise<void>
+  // ── Workflows ────────────────────────────────────────────
+  fetchWorkflows: (propertyId?: string) => Promise<void>
+  createWorkflow: (data: Partial<Workflow>) => Promise<Workflow>
+  updateWorkflow: (id: string, updates: Partial<Workflow> & { steps?: WorkflowStep[] }) => Promise<void>
+  deleteWorkflow: (id: string) => Promise<void>
+  addWorkflowStep: (workflowId: string, step: Partial<WorkflowStep>) => Promise<WorkflowStep>
+  removeWorkflowStep: (stepId: string) => Promise<void>
+  reorderWorkflowSteps: (workflowId: string, stepIds: string[]) => Promise<void>
+  autoGenerateWorkflow: (workflowId: string) => Promise<WorkflowStep[] | null>
+  completeAutoWorkflow: (workflowId: string) => Promise<void>
+  createDefaultWorkflow: (propertyId: string) => Promise<Workflow | null>
 
-  // Worker actions
-  fetchWorkers: () => Promise<void>
-  updateWorker: (id: string, updates: Partial<Worker>) => Promise<void>
+  // ── Missions ─────────────────────────────────────────────
+  fetchMissions: () => Promise<void>
+  fetchMission: (id: string) => Promise<void>
+  getMission: (id: string) => Mission | undefined
+  createMission: (data: Partial<Mission>) => Promise<Mission>
+  updateMission: (id: string, updates: Partial<Mission>) => Promise<void>
+  deleteMission: (id: string) => Promise<void>
+  startMission: (id: string) => Promise<void>
+  completeMission: (id: string, data: { final_status: string }) => Promise<void>
+  completeStep: (stepId: string) => Promise<void>
+  skipStep: (stepId: string, reason: string) => Promise<void>
+  addStepNote: (stepId: string, note: string) => Promise<void>
+  takeStepPhoto: (stepId: string) => Promise<void>
+  reorderMissionRooms: (missionId: string, roomIds: string[]) => Promise<void>
+  createAnomaly: (data: Partial<Anomaly>) => Promise<void>
 
-  // Daily plan actions
-  fetchDailyPlan: (date: string) => Promise<{ plan: DailyPlan | null; steps: PlanStep[] }>
-  saveDailyPlan: (
-    date: string,
-    steps: Omit<PlanStep, 'id' | 'daily_plan_id'>[],
-    jobCount: number,
-    carTrips: number
-  ) => Promise<DailyPlan>
-  updatePlanStatus: (planId: string, status: DailyPlan['status']) => Promise<void>
-
-  // Alert actions
+  // ── Alertes ──────────────────────────────────────────────
   fetchAlerts: () => Promise<void>
   resolveAlert: (id: string) => Promise<void>
-  clearResolvedAlerts: () => Promise<void>
 
-  // Settings actions
+  // ── Paramètres ───────────────────────────────────────────
   fetchSettings: () => Promise<void>
   updateSettings: (updates: Partial<AppSettings>) => Promise<void>
 
@@ -83,11 +86,10 @@ const defaultSettings: AppSettings = {
 
 export const useAppStore = create<AppState>((set, get) => ({
   properties: [],
-  reservations: [],
-  cleaningJobs: [],
+  tasks: [],
+  workflows: [],
+  missions: [],
   workers: [],
-  dailyPlans: [],
-  planSteps: [],
   alerts: [],
   settings: defaultSettings,
   loading: false,
@@ -95,23 +97,23 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setError: (error) => set({ error }),
 
-  // ─── Properties ─────────────────────────────────────────
+  // ─── Propriétés ──────────────────────────────────────────────────────────
 
   fetchProperties: async () => {
     set({ loading: true })
     const { data, error } = await supabase
       .from('properties')
-      .select('*')
+      .select('*, rooms(*), workflows(id, name, is_active)')
       .order('name')
-    if (error) { set({ error: error.message, loading: false }); return }
-    set({ properties: data as Property[], loading: false })
+    if (error) { set({ loading: false }); return }
+    set({ properties: (data ?? []) as Property[], loading: false })
   },
 
   addProperty: async (p) => {
     const { data, error } = await supabase
       .from('properties')
       .insert(p)
-      .select()
+      .select('*, rooms(*)')
       .single()
     if (error) throw new Error(error.message)
     const prop = data as Property
@@ -120,13 +122,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateProperty: async (id, updates) => {
-    const { error } = await supabase
-      .from('properties')
-      .update(updates)
-      .eq('id', id)
+    const { error } = await supabase.from('properties').update(updates).eq('id', id)
     if (error) throw new Error(error.message)
     set((s) => ({
-      properties: s.properties.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+      properties: s.properties.map((p) => p.id === id ? { ...p, ...updates } : p),
     }))
   },
 
@@ -136,183 +135,349 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ properties: s.properties.filter((p) => p.id !== id) }))
   },
 
-  // ─── Reservations ───────────────────────────────────────
-
-  fetchReservations: async () => {
-    set({ loading: true })
+  addRoom: async (propertyId, room) => {
     const { data, error } = await supabase
-      .from('reservations')
-      .select('*, property:properties(*)')
-      .order('check_in', { ascending: false })
-    if (error) { set({ error: error.message, loading: false }); return }
-    set({ reservations: data as Reservation[], loading: false })
-  },
-
-  addReservation: async (r) => {
-    const { data, error } = await supabase
-      .from('reservations')
-      .insert(r)
-      .select('*, property:properties(*)')
+      .from('rooms')
+      .insert({ ...room, property_id: propertyId })
+      .select()
       .single()
     if (error) throw new Error(error.message)
-    const res = data as Reservation
-    set((s) => ({ reservations: [res, ...s.reservations] }))
-    return res
+    const r = data as Room
+    set((s) => ({
+      properties: s.properties.map((p) =>
+        p.id === propertyId ? { ...p, rooms: [...(p.rooms ?? []), r] } : p
+      ),
+    }))
+    return r
   },
 
-  updateReservation: async (id, updates) => {
-    const { error } = await supabase
-      .from('reservations')
-      .update(updates)
-      .eq('id', id)
+  deleteRoom: async (roomId) => {
+    const { error } = await supabase.from('rooms').delete().eq('id', roomId)
     if (error) throw new Error(error.message)
     set((s) => ({
-      reservations: s.reservations.map((r) => (r.id === id ? { ...r, ...updates } : r)),
+      properties: s.properties.map((p) => ({
+        ...p,
+        rooms: p.rooms?.filter((r) => r.id !== roomId) ?? [],
+      })),
     }))
   },
 
-  deleteReservation: async (id) => {
-    const { error } = await supabase.from('reservations').delete().eq('id', id)
-    if (error) throw new Error(error.message)
-    set((s) => ({ reservations: s.reservations.filter((r) => r.id !== id) }))
+  reorderRooms: async (propertyId, roomIds) => {
+    for (let i = 0; i < roomIds.length; i++) {
+      await supabase.from('rooms').update({ order_index: i }).eq('id', roomIds[i])
+    }
+    set((s) => ({
+      properties: s.properties.map((p) => {
+        if (p.id !== propertyId) return p
+        const sorted = [...(p.rooms ?? [])].sort(
+          (a, b) => roomIds.indexOf(a.id) - roomIds.indexOf(b.id)
+        )
+        return { ...p, rooms: sorted }
+      }),
+    }))
   },
 
-  // ─── Cleaning Jobs ───────────────────────────────────────
+  // ─── Tâches ──────────────────────────────────────────────────────────────
 
-  fetchCleaningJobs: async (date) => {
+  fetchTasks: async () => {
+    set({ loading: true })
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .order('title')
+    if (error) { set({ loading: false }); return }
+    set({ tasks: (data ?? []) as Task[], loading: false })
+  },
+
+  createTask: async (data) => {
+    const { data: row, error } = await supabase
+      .from('tasks')
+      .insert(data)
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+    const task = row as Task
+    set((s) => ({ tasks: [...s.tasks, task] }))
+    return task
+  },
+
+  updateTask: async (id, updates) => {
+    const { error } = await supabase.from('tasks').update(updates).eq('id', id)
+    if (error) throw new Error(error.message)
+    set((s) => ({
+      tasks: s.tasks.map((t) => t.id === id ? { ...t, ...updates } : t),
+    }))
+  },
+
+  deleteTask: async (id) => {
+    const { error } = await supabase.from('tasks').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+    set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }))
+  },
+
+  // ─── Workflows ───────────────────────────────────────────────────────────
+
+  fetchWorkflows: async (propertyId) => {
     set({ loading: true })
     let query = supabase
-      .from('cleaning_jobs')
-      .select('*, property:properties(*), worker:workers(*), reservation:reservations(*)')
-    if (date) query = query.eq('scheduled_date', date)
-    query = query.order('scheduled_date', { ascending: true })
-    const { data, error } = await query
-    if (error) { set({ error: error.message, loading: false }); return }
-    set({ cleaningJobs: data as CleaningJob[], loading: false })
-  },
-
-  addCleaningJob: async (j) => {
-    const { data, error } = await supabase
-      .from('cleaning_jobs')
-      .insert(j)
-      .select('*, property:properties(*), worker:workers(*)')
-      .single()
-    if (error) throw new Error(error.message)
-    const job = data as CleaningJob
-    set((s) => ({ cleaningJobs: [...s.cleaningJobs, job] }))
-    return job
-  },
-
-  updateCleaningJob: async (id, updates) => {
-    const { error } = await supabase
-      .from('cleaning_jobs')
-      .update(updates)
-      .eq('id', id)
-    if (error) throw new Error(error.message)
-    set((s) => ({
-      cleaningJobs: s.cleaningJobs.map((j) => (j.id === id ? { ...j, ...updates } : j)),
-    }))
-  },
-
-  deleteCleaningJob: async (id) => {
-    const { error } = await supabase.from('cleaning_jobs').delete().eq('id', id)
-    if (error) throw new Error(error.message)
-    set((s) => ({ cleaningJobs: s.cleaningJobs.filter((j) => j.id !== id) }))
-  },
-
-  // ─── Workers ─────────────────────────────────────────────
-
-  fetchWorkers: async () => {
-    const { data, error } = await supabase
-      .from('workers')
-      .select('*')
-      .eq('is_active', true)
+      .from('workflows')
+      .select('*, property:properties(id, name, address), steps:workflow_steps(*, task:tasks(*), room:rooms(*))')
       .order('name')
-    if (error) { set({ error: error.message }); return }
-    set({ workers: data as Worker[] })
+    if (propertyId) query = query.eq('property_id', propertyId)
+    const { data, error } = await query
+    if (error) { set({ loading: false }); return }
+    set({ workflows: (data ?? []) as Workflow[], loading: false })
   },
 
-  updateWorker: async (id, updates) => {
-    const { error } = await supabase.from('workers').update(updates).eq('id', id)
+  createWorkflow: async (data) => {
+    const { data: row, error } = await supabase
+      .from('workflows')
+      .insert(data)
+      .select('*, property:properties(id, name, address)')
+      .single()
+    if (error) throw new Error(error.message)
+    const wf = row as Workflow
+    set((s) => ({ workflows: [...s.workflows, wf] }))
+    return wf
+  },
+
+  updateWorkflow: async (id, updates) => {
+    const { steps, ...wfUpdates } = updates
+    const { error } = await supabase.from('workflows').update(wfUpdates).eq('id', id)
     if (error) throw new Error(error.message)
     set((s) => ({
-      workers: s.workers.map((w) => (w.id === id ? { ...w, ...updates } : w)),
+      workflows: s.workflows.map((w) => w.id === id ? { ...w, ...updates } : w),
     }))
   },
 
-  // ─── Daily Plan ──────────────────────────────────────────
-
-  fetchDailyPlan: async (date) => {
-    const { data: plan } = await supabase
-      .from('daily_plans')
-      .select('*')
-      .eq('date', date)
-      .maybeSingle()
-
-    if (!plan) return { plan: null, steps: [] }
-
-    const { data: steps } = await supabase
-      .from('plan_steps')
-      .select('*, worker:workers(*), cleaning_job:cleaning_jobs(*, property:properties(*))')
-      .eq('daily_plan_id', plan.id)
-      .order('order_index')
-
-    const typedSteps = (steps ?? []) as PlanStep[]
-    set({ planSteps: typedSteps })
-    return { plan: plan as DailyPlan, steps: typedSteps }
+  deleteWorkflow: async (id) => {
+    const { error } = await supabase.from('workflows').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+    set((s) => ({ workflows: s.workflows.filter((w) => w.id !== id) }))
   },
 
-  saveDailyPlan: async (date, steps, jobCount, carTrips) => {
-    // Upsert le plan
-    const { data: existing } = await supabase
-      .from('daily_plans')
-      .select('id')
-      .eq('date', date)
-      .maybeSingle()
-
-    let planId: string
-    if (existing) {
-      planId = existing.id
-      await supabase
-        .from('daily_plans')
-        .update({ total_jobs: jobCount, car_trips: carTrips, status: 'draft' })
-        .eq('id', planId)
-      await supabase.from('plan_steps').delete().eq('daily_plan_id', planId)
-    } else {
-      const { data: newPlan, error } = await supabase
-        .from('daily_plans')
-        .insert({ date, total_jobs: jobCount, car_trips: carTrips, status: 'draft' })
-        .select()
-        .single()
-      if (error) throw new Error(error.message)
-      planId = newPlan.id
-    }
-
-    // Insérer les étapes
-    if (steps.length > 0) {
-      const stepsWithPlanId = steps.map((s, i) => ({
-        ...s,
-        daily_plan_id: planId,
-        order_index: i,
-      }))
-      const { error } = await supabase.from('plan_steps').insert(stepsWithPlanId)
-      if (error) throw new Error(error.message)
-    }
-
-    const { data: savedPlan } = await supabase
-      .from('daily_plans')
-      .select('*')
-      .eq('id', planId)
+  addWorkflowStep: async (workflowId, step) => {
+    const { data, error } = await supabase
+      .from('workflow_steps')
+      .insert({ ...step, workflow_id: workflowId })
+      .select('*, task:tasks(*), room:rooms(*)')
       .single()
-
-    return savedPlan as DailyPlan
+    if (error) throw new Error(error.message)
+    const s = data as WorkflowStep
+    set((state) => ({
+      workflows: state.workflows.map((w) =>
+        w.id === workflowId ? { ...w, steps: [...(w.steps ?? []), s] } : w
+      ),
+    }))
+    return s
   },
 
-  updatePlanStatus: async (planId, status) => {
-    await supabase.from('daily_plans').update({ status }).eq('id', planId)
+  removeWorkflowStep: async (stepId) => {
+    const { error } = await supabase.from('workflow_steps').delete().eq('id', stepId)
+    if (error) throw new Error(error.message)
+    set((state) => ({
+      workflows: state.workflows.map((w) => ({
+        ...w,
+        steps: w.steps?.filter((s) => s.id !== stepId) ?? [],
+      })),
+    }))
   },
 
-  // ─── Alerts ──────────────────────────────────────────────
+  reorderWorkflowSteps: async (workflowId, stepIds) => {
+    for (let i = 0; i < stepIds.length; i++) {
+      await supabase.from('workflow_steps').update({ order_index: i }).eq('id', stepIds[i])
+    }
+  },
+
+  autoGenerateWorkflow: async (workflowId) => {
+    // Génère automatiquement les étapes selon les pièces du logement
+    const wf = get().workflows.find((w) => w.id === workflowId)
+    if (!wf?.property_id) return null
+    // TODO: logique auto-génération côté serveur ou locale
+    return wf.steps ?? []
+  },
+
+  completeAutoWorkflow: async (workflowId) => {
+    await supabase.from('workflows').update({ is_active: true }).eq('id', workflowId)
+    set((s) => ({
+      workflows: s.workflows.map((w) =>
+        w.id === workflowId ? { ...w, is_active: true } : w
+      ),
+    }))
+  },
+
+  createDefaultWorkflow: async (propertyId) => {
+    try {
+      const prop = get().properties.find((p) => p.id === propertyId)
+      const name = `Workflow ${prop?.name ?? 'standard'}`
+      const { data, error } = await supabase
+        .from('workflows')
+        .insert({ name, property_id: propertyId, is_active: true })
+        .select('*, property:properties(id, name, address)')
+        .single()
+      if (error) return null
+      const wf = data as Workflow
+      set((s) => ({ workflows: [...s.workflows, wf] }))
+      return wf
+    } catch {
+      return null
+    }
+  },
+
+  // ─── Missions ────────────────────────────────────────────────────────────
+
+  fetchMissions: async () => {
+    set({ loading: true })
+    const { data, error } = await supabase
+      .from('missions')
+      .select(`
+        *,
+        property:properties(id, name, address, building_code, door_code, key_box, key_instructions, linen_location, dirty_linen_location, products_location, trash_location, notes),
+        steps:mission_steps(*, task:tasks(*), room:rooms(*)),
+        anomalies:anomalies(*),
+        photos:mission_photos(*),
+        report:mission_reports(*)
+      `)
+      .order('scheduled_date')
+    if (error) { set({ loading: false }); return }
+    set({ missions: (data ?? []) as Mission[], loading: false })
+  },
+
+  fetchMission: async (id) => {
+    const { data, error } = await supabase
+      .from('missions')
+      .select(`
+        *,
+        property:properties(id, name, address, building_code, door_code, key_box, key_instructions, linen_location, dirty_linen_location, products_location, trash_location, notes),
+        steps:mission_steps(*, task:tasks(*), room:rooms(*)),
+        anomalies:anomalies(*),
+        photos:mission_photos(*),
+        report:mission_reports(*)
+      `)
+      .eq('id', id)
+      .single()
+    if (error) return
+    const mission = data as Mission
+    set((s) => ({
+      missions: s.missions.some((m) => m.id === id)
+        ? s.missions.map((m) => m.id === id ? mission : m)
+        : [...s.missions, mission],
+    }))
+  },
+
+  getMission: (id) => get().missions.find((m) => m.id === id),
+
+  createMission: async (data) => {
+    const { data: row, error } = await supabase
+      .from('missions')
+      .insert(data)
+      .select(`*, property:properties(id, name, address)`)
+      .single()
+    if (error) throw new Error(error.message)
+    const mission = row as Mission
+    set((s) => ({ missions: [mission, ...s.missions] }))
+    return mission
+  },
+
+  updateMission: async (id, updates) => {
+    const { error } = await supabase.from('missions').update(updates).eq('id', id)
+    if (error) throw new Error(error.message)
+    set((s) => ({
+      missions: s.missions.map((m) => m.id === id ? { ...m, ...updates } : m),
+    }))
+  },
+
+  deleteMission: async (id) => {
+    const { error } = await supabase.from('missions').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+    set((s) => ({ missions: s.missions.filter((m) => m.id !== id) }))
+  },
+
+  startMission: async (id) => {
+    await supabase.from('missions').update({ status: 'in_progress' }).eq('id', id)
+    set((s) => ({
+      missions: s.missions.map((m) =>
+        m.id === id ? { ...m, status: 'in_progress' } : m
+      ),
+    }))
+  },
+
+  completeMission: async (id, { final_status }) => {
+    await supabase.from('missions').update({ status: 'completed' }).eq('id', id)
+    // Créer le rapport
+    const mission = get().missions.find((m) => m.id === id)
+    const steps = mission?.steps ?? []
+    await supabase.from('mission_reports').insert({
+      mission_id: id,
+      final_status,
+      steps_total: steps.length,
+      steps_completed: steps.filter((s) => s.status === 'completed').length,
+      anomalies_count: mission?.anomalies?.length ?? 0,
+    })
+    await get().fetchMission(id)
+  },
+
+  completeStep: async (stepId) => {
+    await supabase
+      .from('mission_steps')
+      .update({ status: 'completed' })
+      .eq('id', stepId)
+    set((s) => ({
+      missions: s.missions.map((m) => ({
+        ...m,
+        steps: m.steps?.map((step) =>
+          step.id === stepId ? { ...step, status: 'completed' } : step
+        ),
+      })),
+    }))
+  },
+
+  skipStep: async (stepId, reason) => {
+    await supabase
+      .from('mission_steps')
+      .update({ status: 'skipped', skip_reason: reason })
+      .eq('id', stepId)
+    set((s) => ({
+      missions: s.missions.map((m) => ({
+        ...m,
+        steps: m.steps?.map((step) =>
+          step.id === stepId
+            ? { ...step, status: 'skipped', skip_reason: reason }
+            : step
+        ),
+      })),
+    }))
+  },
+
+  addStepNote: async (stepId, note) => {
+    await supabase.from('mission_steps').update({ comment: note }).eq('id', stepId)
+    set((s) => ({
+      missions: s.missions.map((m) => ({
+        ...m,
+        steps: m.steps?.map((step) =>
+          step.id === stepId ? { ...step, comment: note } : step
+        ),
+      })),
+    }))
+  },
+
+  takeStepPhoto: async (_stepId) => {
+    // TODO: ouvrir caméra native via file input
+  },
+
+  reorderMissionRooms: async (_missionId, _roomIds) => {
+    // TODO: réordre des étapes selon l'ordre des pièces
+  },
+
+  createAnomaly: async (data) => {
+    const { error } = await supabase.from('anomalies').insert(data)
+    if (error) throw new Error(error.message)
+    if (data.mission_id) {
+      await get().fetchMission(data.mission_id)
+    }
+  },
+
+  // ─── Alertes ─────────────────────────────────────────────────────────────
 
   fetchAlerts: async () => {
     const { data, error } = await supabase
@@ -320,8 +485,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       .select('*')
       .eq('resolved', false)
       .order('created_at', { ascending: false })
-    if (error) { set({ error: error.message }); return }
-    set({ alerts: data as Alert[] })
+    if (error) return
+    set({ alerts: (data ?? []) as Alert[] })
   },
 
   resolveAlert: async (id) => {
@@ -329,11 +494,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ alerts: s.alerts.filter((a) => a.id !== id) }))
   },
 
-  clearResolvedAlerts: async () => {
-    await supabase.from('alerts').delete().eq('resolved', true)
-  },
-
-  // ─── Settings ────────────────────────────────────────────
+  // ─── Paramètres ──────────────────────────────────────────────────────────
 
   fetchSettings: async () => {
     const { data, error } = await supabase.from('app_settings').select('*')

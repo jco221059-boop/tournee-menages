@@ -4,32 +4,32 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: '#0F1117',
-        surface: '#1A1D27',
-        'surface-2': '#232636',
-        'surface-3': '#2D3047',
-        border: '#2D3047',
+        bg: '#FAF7F2',
+        surface: '#FFFFFF',
+        'surface-2': '#F5F0EA',
+        'surface-3': '#EDE0D0',
+        border: '#EDE0D0',
         primary: {
-          DEFAULT: '#4F7EFF',
-          hover: '#3A6AEE',
-          muted: '#1E3A7A',
+          DEFAULT: '#6B9E78',
+          hover: '#5A8A67',
+          muted: '#EEF4EF',
         },
         success: {
-          DEFAULT: '#3ECF6B',
-          muted: '#1A4D2E',
+          DEFAULT: '#6B9E78',
+          muted: '#EEF4EF',
         },
         warning: {
-          DEFAULT: '#F5A623',
-          muted: '#4D3400',
+          DEFAULT: '#D97706',
+          muted: '#FEF3C7',
         },
         danger: {
-          DEFAULT: '#FF5757',
-          muted: '#4D1A1A',
+          DEFAULT: '#DC2626',
+          muted: '#FEF2F2',
         },
         text: {
-          primary: '#FFFFFF',
-          secondary: '#8B8FA8',
-          muted: '#5A5E77',
+          primary: '#2C1F0E',
+          secondary: '#A8937A',
+          muted: '#C4A882',
         },
         worker: {
           jc: '#4F7EFF',

@@ -6,17 +6,22 @@ import { Spinner } from './components/ui'
 
 // Pages
 import LoginPage from './pages/LoginPage'
-import TodayPage from './pages/TodayPage'
+import RoleSelectorPage from './pages/RoleSelectorPage'
+import MissionsPage from './pages/MissionsPage'
+import MissionDetailPage from './pages/MissionDetailPage'
+import MissionFormPage from './pages/MissionFormPage'
+import MissionPreviewPage from './pages/MissionPreviewPage'
+import MissionStepPage from './pages/MissionStepPage'
+import MissionFinalPage from './pages/MissionFinalPage'
+import AnomalyPage from './pages/AnomalyPage'
+import ReportPage from './pages/ReportPage'
+import ConfigPage from './pages/ConfigPage'
 import PropertiesPage from './pages/PropertiesPage'
 import PropertyFormPage from './pages/PropertyFormPage'
-import ReservationsPage from './pages/ReservationsPage'
-import ReservationFormPage from './pages/ReservationFormPage'
-import OptimizePage from './pages/OptimizePage'
-import PlanningPage from './pages/PlanningPage'
-import FieldModePage from './pages/FieldModePage'
-import AlertsPage from './pages/AlertsPage'
+import WorkflowsPage from './pages/WorkflowsPage'
+import WorkflowEditorPage from './pages/WorkflowEditorPage'
+import TasksPage from './pages/TasksPage'
 import SettingsPage from './pages/SettingsPage'
-import StatsPage from './pages/StatsPage'
 
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -30,7 +35,7 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const { user, loading, initialize } = useAuthStore()
+  const { user, role, loading, initialize } = useAuthStore()
 
   useEffect(() => {
     initialize()
@@ -38,10 +43,10 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full bg-bg">
+      <div className="flex items-center justify-center h-full" style={{ background: '#FAF7F2' }}>
         <div className="flex flex-col items-center gap-3">
           <Spinner size={36} />
-          <p className="text-text-secondary text-sm">Chargement…</p>
+          <p className="text-sm" style={{ color: '#A8937A' }}>Chargement…</p>
         </div>
       </div>
     )
@@ -58,41 +63,79 @@ export default function App() {
     )
   }
 
+  // Utilisateur connecté mais sans rôle → sélection du rôle
+  if (!role) {
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route path="*" element={<RoleSelectorPage />} />
+        </Routes>
+      </BrowserRouter>
+    )
+  }
+
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Navigate to="/today" replace />} />
-        <Route path="/" element={<Navigate to="/today" replace />} />
+        {/* ── Missions ─────────────────────────────────────── */}
+        <Route path="/missions" element={
+          <ProtectedLayout><MissionsPage /></ProtectedLayout>
+        } />
+        <Route path="/missions/new" element={
+          <ProtectedLayout><MissionFormPage /></ProtectedLayout>
+        } />
+        <Route path="/missions/:id" element={
+          <ProtectedLayout><MissionDetailPage /></ProtectedLayout>
+        } />
+        <Route path="/missions/:id/preview" element={
+          <ProtectedLayout><MissionPreviewPage /></ProtectedLayout>
+        } />
+        <Route path="/missions/:id/steps" element={
+          <MissionStepPage />
+        } />
+        <Route path="/missions/:id/final" element={
+          <ProtectedLayout><MissionFinalPage /></ProtectedLayout>
+        } />
+        <Route path="/missions/:id/report" element={
+          <ProtectedLayout><ReportPage /></ProtectedLayout>
+        } />
+        <Route path="/missions/:id/anomaly" element={
+          <ProtectedLayout><AnomalyPage /></ProtectedLayout>
+        } />
 
-        {/* Main tabs */}
-        <Route path="/today" element={
-          <ProtectedLayout><TodayPage /></ProtectedLayout>
+        {/* ── Config ───────────────────────────────────────── */}
+        <Route path="/config" element={
+          <ProtectedLayout><ConfigPage /></ProtectedLayout>
         } />
-        <Route path="/planning" element={
-          <ProtectedLayout><PlanningPage /></ProtectedLayout>
+        <Route path="/config/properties" element={
+          <ProtectedLayout><PropertiesPage /></ProtectedLayout>
         } />
-        <Route path="/optimize" element={
-          <ProtectedLayout><OptimizePage /></ProtectedLayout>
+        <Route path="/config/properties/new" element={
+          <ProtectedLayout><PropertyFormPage /></ProtectedLayout>
         } />
-        <Route path="/field" element={
-          <ProtectedLayout><FieldModePage /></ProtectedLayout>
+        <Route path="/config/properties/:id" element={
+          <ProtectedLayout><PropertyFormPage /></ProtectedLayout>
         } />
-        <Route path="/alerts" element={
-          <ProtectedLayout><AlertsPage /></ProtectedLayout>
+        <Route path="/config/workflows" element={
+          <ProtectedLayout><WorkflowsPage /></ProtectedLayout>
         } />
+        <Route path="/config/workflows/new" element={
+          <ProtectedLayout><WorkflowEditorPage /></ProtectedLayout>
+        } />
+        <Route path="/config/workflows/:id" element={
+          <ProtectedLayout><WorkflowEditorPage /></ProtectedLayout>
+        } />
+        <Route path="/config/tasks" element={
+          <ProtectedLayout><TasksPage /></ProtectedLayout>
+        } />
+
+        {/* ── Réglages ─────────────────────────────────────── */}
         <Route path="/settings" element={
           <ProtectedLayout><SettingsPage /></ProtectedLayout>
         } />
 
-        {/* Sub pages (no bottom nav) */}
-        <Route path="/properties" element={<PropertiesPage />} />
-        <Route path="/properties/:id" element={<PropertyFormPage />} />
-        <Route path="/reservations" element={<ReservationsPage />} />
-        <Route path="/reservations/:id" element={<ReservationFormPage />} />
-        <Route path="/stats" element={<StatsPage />} />
-
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/today" replace />} />
+        {/* ── Redirection par défaut ────────────────────────── */}
+        <Route path="*" element={<Navigate to="/missions" replace />} />
       </Routes>
     </BrowserRouter>
   )

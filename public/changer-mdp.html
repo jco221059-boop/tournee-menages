@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Changer le mot de passe</title>
+  <style>
+    body { font-family: sans-serif; max-width: 400px; margin: 60px auto; padding: 20px; }
+    input { width: 100%; padding: 10px; margin: 10px 0; font-size: 16px; box-sizing: border-box; }
+    button { width: 100%; padding: 12px; background: #4F7EFF; color: white; border: none; font-size: 16px; cursor: pointer; border-radius: 8px; }
+    #message { margin-top: 15px; padding: 10px; border-radius: 8px; display: none; }
+    .ok { background: #d4edda; color: #155724; }
+    .err { background: #f8d7da; color: #721c24; }
+  </style>
+</head>
+<body>
+  <h2>Changer le mot de passe</h2>
+  <input type="password" id="mdp" placeholder="Nouveau mot de passe" />
+  <button onclick="changer()">Changer</button>
+  <div id="message"></div>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+    const supabase = createClient(
+      'https://vtllysujdzbfyvujzkwu.supabase.co',
+      'sb_publishable_xAzqeccFl4Plf2f3wxIAMg_wVDPfvEh'
+    )
+    window.changer = async function() {
+      const mdp = document.getElementById('mdp').value
+      const msg = document.getElementById('message')
+      if (!mdp || mdp.length < 6) {
+        msg.className = 'err'; msg.style.display = 'block'
+        msg.textContent = 'Le mot de passe doit faire au moins 6 caractères.'
+        return
+      }
+      const { error } = await supabase.auth.updateUser({ password: mdp })
+      msg.style.display = 'block'
+      if (error) {
+        msg.className = 'err'
+        msg.textContent = 'Erreur : ' + error.message
+      } else {
+        msg.className = 'ok'
+        msg.textContent = 'Mot de passe changé ! Tu peux maintenant te connecter sur Vercel.'
+      }
+    }
+  </script>
+</body>
+</html>
