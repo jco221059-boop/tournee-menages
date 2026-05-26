@@ -7,14 +7,14 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Tournée Ménages',
-        short_name: 'TM',
+        name: 'MénageFlow',
+        short_name: 'MénageFlow',
         description: 'Organisation des ménages Airbnb',
-        theme_color: '#0F1117',
-        background_color: '#0F1117',
+        theme_color: '#FAF7F2',
+        background_color: '#FAF7F2',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
