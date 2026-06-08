@@ -137,13 +137,31 @@ export default function MissionDetailPage() {
     ? format(parseISO(mission.scheduled_date), 'EEEE d MMMM', { locale: fr })
     : ''
 
+  // Pièces dans l'ordre pour navigation carrousel
+  const orderedRooms = (mission.property?.rooms ?? [])
+    .filter(r => steps.some(s => s.room_id === r.id))
+    .sort((a, b) => a.order_index - b.order_index)
+
+  const firstRoom = orderedRooms[0]
+
+  // Pour "Reprendre" : trouver la pièce en cours via room_progress
+  const roomProgress = (mission as any).room_progress ?? []
+  const inProgressRoomId = (() => {
+    for (const r of orderedRooms) {
+      const prog = roomProgress.find((p: any) => p.room_id === r.id)
+      if (!prog || (!prog.tasks_completed && !prog.photos_completed)) return r.id
+      if (prog.tasks_completed && !prog.photos_completed) return r.id
+    }
+    return firstRoom?.id
+  })()
+
   const ctaLabel = mission.status === 'pending' ? 'Commencer le ménage'
     : mission.status === 'in_progress' ? 'Reprendre la mission'
     : null
 
   const ctaRoute = mission.status === 'pending'
-    ? `/missions/${id}/preview`
-    : `/missions/${id}/steps`
+    ? (firstRoom ? `/missions/${id}/rooms/${firstRoom.id}/tasks` : `/missions/${id}/preview`)
+    : `/missions/${id}/rooms/${inProgressRoomId ?? firstRoom?.id}/tasks`
 
   const ctaBg = mission.status === 'in_progress' ? '#D97706' : '#6B9E78'
 

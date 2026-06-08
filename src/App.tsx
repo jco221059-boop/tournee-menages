@@ -11,7 +11,8 @@ import MissionsPage from './pages/MissionsPage'
 import MissionDetailPage from './pages/MissionDetailPage'
 import MissionFormPage from './pages/MissionFormPage'
 import MissionPreviewPage from './pages/MissionPreviewPage'
-import MissionStepPage from './pages/MissionStepPage'
+import RoomCarouselPage from './pages/RoomCarouselPage'
+import RoomFinalPhotoPage from './pages/RoomFinalPhotoPage'
 import MissionFinalPage from './pages/MissionFinalPage'
 import AnomalyPage from './pages/AnomalyPage'
 import ReportPage from './pages/ReportPage'
@@ -90,8 +91,11 @@ export default function App() {
         <Route path="/missions/:id/preview" element={
           <ProtectedLayout><MissionPreviewPage /></ProtectedLayout>
         } />
-        <Route path="/missions/:id/steps" element={
-          <MissionStepPage />
+        <Route path="/missions/:id/rooms/:roomId/tasks" element={
+          <RoomCarouselPage />
+        } />
+        <Route path="/missions/:id/rooms/:roomId/photos" element={
+          <RoomFinalPhotoPage />
         } />
         <Route path="/missions/:id/final" element={
           <ProtectedLayout><MissionFinalPage /></ProtectedLayout>

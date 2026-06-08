@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import type {
   Property, Worker, Alert, AppSettings,
   Mission, Task, Workflow, WorkflowStep, Room,
-  MissionStep, Anomaly,
+  MissionStep, Anomaly, WorkflowRoomFinalPhoto,
 } from '../types'
 
 interface AppState {
@@ -61,6 +61,9 @@ interface AppState {
   takeStepPhoto: (stepId: string) => Promise<void>
   reorderMissionRooms: (missionId: string, roomIds: string[]) => Promise<void>
   createAnomaly: (data: Partial<Anomaly>) => Promise<void>
+  completeTask: (stepId: string, data: { photo_url?: string }) => Promise<void>
+  completeRoomFinalPhotos: (missionId: string, roomId: string, photos: Record<string, string>) => Promise<void>
+  saveWorkflowFinalPhotos: (workflowId: string, byRoom: Record<string, WorkflowRoomFinalPhoto[]>) => Promise<void>
 
   // ── Alertes ──────────────────────────────────────────────
   fetchAlerts: () => Promise<void>
@@ -221,7 +224,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ loading: true })
     let query = supabase
       .from('workflows')
-      .select('*, property:properties(id, name, address), steps:workflow_steps(*, task:tasks(*), room:rooms(*))')
+      .select('*, property:properties(id, name, address, rooms(*)), steps:workflow_steps(*, task:tasks(*), room:rooms(*)), room_final_photos:workflow_room_final_photos(*)')
       .order('name')
     if (propertyId) query = query.eq('property_id', propertyId)
     const { data, error } = await query
@@ -348,8 +351,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       .from('missions')
       .select(`
         *,
-        property:properties(id, name, address, building_code, door_code, key_box, key_instructions, linen_location, dirty_linen_location, products_location, trash_location, notes),
+        property:properties(id, name, address, building_code, door_code, key_box, key_instructions, linen_location, dirty_linen_location, products_location, trash_location, notes, rooms(id, name, room_type, order_index)),
+        workflow:workflows(id, name, room_final_photos:workflow_room_final_photos(*)),
         steps:mission_steps(*, task:tasks(*), room:rooms(*)),
+        room_progress:mission_room_progress(*),
         anomalies:anomalies(*),
         photos:mission_photos(*),
         report:mission_reports(*)
@@ -475,6 +480,74 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (data.mission_id) {
       await get().fetchMission(data.mission_id)
     }
+  },
+
+  completeTask: async (stepId, { photo_url }) => {
+    await supabase.from('mission_steps').update({ status: 'completed' }).eq('id', stepId)
+    if (photo_url) {
+      const mission = get().missions.find(m => m.steps?.some(s => s.id === stepId))
+      if (mission) {
+        await supabase.from('mission_photos').insert({ mission_id: mission.id, step_id: stepId, url: photo_url })
+      }
+    }
+    set((s) => ({
+      missions: s.missions.map((m) => ({
+        ...m,
+        steps: m.steps?.map((step) =>
+          step.id === stepId ? { ...step, status: 'completed' } : step
+        ),
+      })),
+    }))
+  },
+
+  completeRoomFinalPhotos: async (missionId, roomId, photos) => {
+    const entries = Object.entries(photos)
+    if (entries.length > 0) {
+      const rows = entries.map(([finalPhotoId, url]) => ({
+        mission_id: missionId,
+        room_id: roomId,
+        final_photo_id: finalPhotoId,
+        url,
+      }))
+      await supabase.from('mission_room_final_photos').upsert(rows, { onConflict: 'mission_id,room_id,final_photo_id' })
+    }
+    await supabase
+      .from('mission_room_progress')
+      .upsert({ mission_id: missionId, room_id: roomId, photos_completed: true, completed_at: new Date().toISOString() }, { onConflict: 'mission_id,room_id' })
+    await get().fetchMission(missionId)
+  },
+
+  saveWorkflowFinalPhotos: async (workflowId, byRoom) => {
+    const allSlots = Object.entries(byRoom).flatMap(([roomId, slots]) =>
+      slots.map((s, i) => ({
+        id: s.isNew ? undefined : s.id,
+        workflow_id: workflowId,
+        room_id: roomId,
+        label: s.label,
+        reference_photo_url: s.reference_photo_url ?? '',
+        order_index: s.order_index ?? i,
+      }))
+    )
+    const newSlots = allSlots.filter(s => !s.id)
+    const existingSlots = allSlots.filter(s => s.id).map(s => ({ ...s, id: s.id! }))
+    if (newSlots.length > 0) {
+      await supabase.from('workflow_room_final_photos').insert(newSlots.map(({ id: _id, ...rest }) => rest))
+    }
+    for (const slot of existingSlots) {
+      await supabase.from('workflow_room_final_photos').update({
+        label: slot.label,
+        reference_photo_url: slot.reference_photo_url,
+        order_index: slot.order_index,
+      }).eq('id', slot.id)
+    }
+    // Supprimer les slots retirés
+    const keptIds = existingSlots.map(s => s.id)
+    const { data: existing } = await supabase.from('workflow_room_final_photos').select('id').eq('workflow_id', workflowId)
+    const toDelete = (existing ?? []).filter((r: { id: string }) => !keptIds.includes(r.id)).map((r: { id: string }) => r.id)
+    if (toDelete.length > 0) {
+      await supabase.from('workflow_room_final_photos').delete().in('id', toDelete)
+    }
+    await get().fetchWorkflows()
   },
 
   // ─── Alertes ─────────────────────────────────────────────────────────────

@@ -42,6 +42,7 @@ export interface Task {
   photo_required: boolean
   can_skip: boolean
   video_url?: string | null
+  reference_photo_url?: string | null
   created_at: string
 }
 
@@ -54,6 +55,36 @@ export interface WorkflowStep {
   room?: Room
   order_index: number
   is_mandatory: boolean
+  requires_photo?: boolean
+}
+
+export interface WorkflowRoomFinalPhoto {
+  id: string
+  workflow_id: string
+  room_id: string
+  label: string
+  reference_photo_url: string
+  order_index: number
+  created_at: string
+  isNew?: boolean
+}
+
+export interface MissionRoomFinalPhoto {
+  id: string
+  mission_id: string
+  room_id: string
+  final_photo_id?: string | null
+  url: string
+  taken_at: string
+}
+
+export interface MissionRoomProgress {
+  id: string
+  mission_id: string
+  room_id: string
+  tasks_completed: boolean
+  photos_completed: boolean
+  completed_at?: string | null
 }
 
 export interface Workflow {
@@ -63,6 +94,7 @@ export interface Workflow {
   property?: Property
   is_active: boolean
   steps?: WorkflowStep[]
+  room_final_photos?: WorkflowRoomFinalPhoto[]
   created_at: string
 }
 
@@ -141,6 +173,7 @@ export interface Mission {
   property_id: string
   property?: Property
   workflow_id?: string | null
+  workflow?: { id: string; name: string; room_final_photos?: WorkflowRoomFinalPhoto[] } | null
   status: MissionStatus
   scheduled_date: string
   scheduled_time?: string | null
@@ -148,6 +181,7 @@ export interface Mission {
   time_tracking_mode: 'none' | 'start_end'
   notes?: string | null
   steps?: MissionStep[]
+  room_progress?: MissionRoomProgress[]
   anomalies?: Anomaly[]
   photos?: MissionPhoto[]
   report?: MissionReport
